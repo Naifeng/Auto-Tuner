@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd">
+  <key id="key0" for="edge" attr.name="edge_properties" attr.type="boolean" />
+  <key id="key1" for="edge" attr.name="edge_properties" attr.type="boolean" />
+  <key id="key2" for="edge" attr.name="edge_properties" attr.type="int" />
+  <key id="key3" for="node" attr.name="vectex_properties_is_hardware" attr.type="boolean" />
+  <key id="key4" for="node" attr.name="vectex_properties_is_kernel" attr.type="boolean" />
+  <key id="key5" for="node" attr.name="vectex_properties_is_step" attr.type="boolean" />
+  <key id="key6" for="node" attr.name="vectex_properties_step" attr.type="int" />
+  <graph id="G" edgedefault="undirected" parse.nodeids="canonical" parse.edgeids="canonical" parse.order="nodesfirst">
+    <node id="n0">
+      <data key="key3">1</data>
+      <data key="key4">0</data>
+      <data key="key5">0</data>
+      <data key="key6">0</data>
+    </node>
+    <node id="n1">
+      <data key="key3">1</data>
+      <data key="key4">0</data>
+      <data key="key5">0</data>
+      <data key="key6">1</data>
+    </node>
+    <node id="n2">
+      <data key="key3">0</data>
+      <data key="key4">1</data>
+      <data key="key5">0</data>
+      <data key="key6">2</data>
+    </node>
+    <node id="n3">
+      <data key="key3">0</data>
+      <data key="key4">1</data>
+      <data key="key5">0</data>
+      <data key="key6">3</data>
+    </node>
+    <node id="n4">
+      <data key="key3">0</data>
+      <data key="key4">1</data>
+      <data key="key5">0</data>
+      <data key="key6">4</data>
+    </node>
+    <node id="n5">
+      <data key="key3">0</data>
+      <data key="key4">1</data>
+      <data key="key5">0</data>
+      <data key="key6">5</data>
+    </node>
+    <node id="n6">
+      <data key="key3">0</data>
+      <data key="key4">1</data>
+      <data key="key5">0</data>
+      <data key="key6">6</data>
+    </node>
+    <node id="n7">
+      <data key="key3">0</data>
+      <data key="key4">0</data>
+      <data key="key5">1</data>
+      <data key="key6">11</data>
+    </node>
+    <node id="n8">
+      <data key="key3">0</data>
+      <data key="key4">0</data>
+      <data key="key5">1</data>
+      <data key="key6">12</data>
+    </node>
+    <edge id="e0" source="n0" target="n2">
+      <data key="key2">0</data>
+      <data key="key2">1</data>
+      <data key="key2">8</data>
+    </edge>
+    <edge id="e1" source="n1" target="n2">
+      <data key="key2">0</data>
+      <data key="key2">1</data>
+      <data key="key2">-2099284679</data>
+    </edge>
+    <edge id="e2" source="n0" target="n3">
+      <data key="key2">0</data>
+      <data key="key2">1</data>
+      <data key="key2">9</data>
+    </edge>
+    <edge id="e3" source="n1" target="n3">
+      <data key="key2">0</data>
+      <data key="key2">1</data>
+      <data key="key2">10</data>
+    </edge>
+    <edge id="e4" source="n8" target="n4">
+      <data key="key2">1</data>
+      <data key="key2">0</data>
+      <data key="key2">13</data>
+    </edge>
+    <edge id="e5" source="n7" target="n5">
+      <data key="key2">1</data>
+      <data key="key2">0</data>
+      <data key="key2">14</data>
+    </edge>
+    <edge id="e6" source="n7" target="n6">
+      <data key="key2">1</data>
+      <data key="key2">0</data>
+      <data key="key2">15</data>
+    </edge>
+  </graph>
+</graphml>

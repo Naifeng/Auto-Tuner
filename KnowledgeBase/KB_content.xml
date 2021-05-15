@@ -1,0 +1,16 @@
+Hardware_t CPU_t 0 18 5e+11
+Hardware_t GPU_t 1 8e+12 1e+10
+Kernel_t GEMM_t 2 
+Kernel_t Matrix_pointwise_t 3 
+Kernel_t BFS_tree_t 4 
+Kernel_t KD_tree_t 5 
+Kernel_t Ball_tree_t 6 
+Step_t DBScan_t 11 
+Step_t Node_classification_sample_t 12 
+Performance_model_t Linear_1d_t 8 2e-12 0
+Performance_model_t Linear_1d_t -2099284679 1.25e-13 0
+Performance_model_t Linear_1d_t 9 2e-12 0
+Performance_model_t Linear_1d_t 10 1.25e-13 0
+Kernel_map_t Always_on_t 13 
+Kernel_map_t If_node_less_than_t 14 1000
+Kernel_map_t If_node_more_than_t 15 1000
