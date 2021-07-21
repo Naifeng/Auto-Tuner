@@ -1,0 +1,3 @@
+Hardware_t CPU_t 0 4 5e+10
+Step_t Blur_t 1 
+Performance_model_t MLP_t 0 1 2 ../../model_config/model.pb ../../model_config/my-model.ckpt

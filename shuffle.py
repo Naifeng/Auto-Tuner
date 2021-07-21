@@ -14,7 +14,7 @@ candidate_df.insert(0, 'runtime', 800) # hard-coded
 
 profile_df = pd.read_csv(profile_csv, header=None)
 # column names need to match
-profile_df.columns = ['runtime', 'input_size', 0, 1, 2] 
+profile_df.columns = ['runtime', 'input_size', 0, 1, 2] # naming the cols
 # print(candidate_df.dtypes)
 # print(profile_df.dtypes)
 

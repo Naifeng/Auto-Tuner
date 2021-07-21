@@ -15,19 +15,12 @@ import sys
 
 tf.set_random_seed(1234)
 
-# TODO: read from command line
-FILENAME = sys.argv[1] # "../halide_dataset/halide_fft_cpu_4000_points_I5.csv" 
-training_size = int(sys.argv[2])
-md5_hash = sys.argv[3]
-
-if not os.path.exists('model_config'):
-    os.makedirs('model_config')
-
-# if not os.path.exists('model_config'):
-#     os.makedirs('model_config/' + md5_hash)
-
-if not os.path.exists('model_results'):
-    os.makedirs('model_results')
+# FILENAME = "../halide_dataset/halide_blur_gpu_1176_points_Quadro.csv"
+FILENAME = "../halide_dataset/halide_blur_cpu_6000_points_Xeon.csv"
+# FILENAME = "../halide_dataset/halide_fft_cpu_4000_points_I7.csv"
+# FILENAME = sys.argv[1]
+# FILENAME = "out.csv"
+training_size = int(sys.argv[1])
 
 data = np.array(pd.read_csv(FILENAME, header=None))
 
@@ -39,7 +32,8 @@ train_label = np.array(train_data[:, [0]])
 
 test_x = np.array(test_data[:, 1:])
 
-# print("test data shape: ", test_data.shape)
+# print(test_data.shape)
+
 # print("train data shape: ", train_data.shape)
 # print("train feature shape: ", train_feature.shape)
 
@@ -59,7 +53,7 @@ test_xs = scaler.transform(test_x)
 # print("scaler: std:", scaler.scale_)
 
 # write mean and var to a .csv file
-f = open('model_config/' + md5_hash + '/preprocessing.csv', 'w')
+f = open('preprocessing_parameters.csv', 'w')
 
 for item in scaler.mean_:
     f.write(str(item)+',')
@@ -79,19 +73,26 @@ prediction = tf.layers.dense(L2, 1)
 # name the output
 tf.identity(prediction, name="output")
 
+
 loss = tf.reduce_mean(tf.square(y - prediction))
 
 saver = tf.train.Saver()
+# saver = tf.train.Saver(tf.trainable_variables())
 
 train_step = tf.train.AdamOptimizer(0.01).minimize(loss)
 
 
 total_parameters = 0
 for variable in tf.trainable_variables():
+
     shape = variable.get_shape()
+    # print(shape)
+    # print(len(shape))
     variable_parameters = 1
     for dim in shape:
+        # print(dim)
         variable_parameters *= dim.value
+    # print(variable_parameters)
     total_parameters += variable_parameters
 # print("total parameters: ", total_parameters)
 
@@ -158,6 +159,7 @@ with tf.Session() as sess:
 
                 sum_aape += aape
 
+
             rho, pval = spearmanr(pred_value_list,truth_value_list)
             curr_mape = round(sum_ape / c, 2)
             
@@ -165,23 +167,27 @@ with tf.Session() as sess:
                 lowest_mape = curr_mape
                 asso_rho = rho
 
-                # write results to a .txt file
-                f = open('model_results/predictions.txt', 'w')
-                for i in range(test_data.shape[0]):
-                    f.writelines(str(prd[i][0]) + "\n")
-                f.close()
-
                 # save the model as a .pb graph
-                with open('model_config/' + md5_hash + '/model.pb', 'wb') as f:
+                with open('model.pb', 'wb') as f:
                     f.write(tf.get_default_graph().as_graph_def().SerializeToString())
 
-                saver.save(sess, 'model_config/' + md5_hash + '/my-model.ckpt')
+                saver.save(sess, "model/my-model.ckpt")
+
+            print("MAPE: ", curr_mape)
 
             # valid rule
             if rho > highest_rho:
                 highest_rho = rho
-            
-            print("MAPE: ", curr_mape)    
+                # write results to a .txt file
+                f = open('re.txt', 'w')
+                variant_runtime = sys.maxsize
+                for i in range(test_data.shape[0]):
+                    f.writelines(str(prd[i][0]) + "\n")
+                    if prd[i][0] < variant_runtime:
+                        variant_runtime = prd[i][0]
+                        variant_schedule = test_x[i]
+                        # print (test_x[i])
+                f.close()
             print('rho:', rho)
             # ------------------#
 
@@ -189,37 +195,64 @@ with tf.Session() as sess:
     # for i in range(test_data.shape[0]):
     #    print(test_data[:, [1]][i][0]) # [1] corresponds to the 'input size'
 
+    # write results to a .txt file
+    # f = open('re.txt', 'w')
+    # # variant_runtime = sys.maxsize
+    # for i in range(test_data.shape[0]):
+    #     f.writelines(str(prd[i][0]) + "\n")
+    #     # if prd[i][0] < variant_runtime:
+    #     #     variant_runtime = prd[i][0]
+    #     #     variant_schedule = test_x[i]
+    #         # print (test_x[i])
+    # f.close()
+
     # variant-selection
     # selected_info = []
     # write variant-selection results to a .csv file
-    f = open('model_results/vs_re_halide_fft.csv', 'a')
-    # TODO: change to automatically read in a vector
-    # input_sizes = [1024, 2048, 4096, 8192, 16384, 32768] # for Halide blur
-    input_sizes = [16, 32, 64, 128] # for Halide fft
-    for j in range(len(input_sizes)):
-        variant_runtime = sys.maxsize
-        for i in range(test_data.shape[0]):
-            # access testing data
-            input_size = test_data[:, [1]][i][0] # [1] corresponds to the 'input size'
-            if input_size == input_sizes[j]:
-                if prd[i][0] < variant_runtime:
-                    variant_runtime = prd[i][0]
-                    truth = test_data[:, [0]][i][0]
-                    variant_schedule = test_x[i]
-        f.write(str(input_sizes[j])+',')
-        f.write(str(variant_runtime)+',')
-        f.write(str(truth)+',')
-        for i in range(len(variant_schedule[1:-1])):
-            f.write(str(variant_schedule[1:-1][i])+',')
-        # f.write('gpu-Quadro') # TODO: read it from filename *_out.csv
-        f.write('cpu-I5') # TODO: read it from filename *_out.csv
-        f.write('\n')
-    f.close()
+    # f = open('vs_re_halide_fft.csv', 'a')
+    # # TODO: change to automatically read in a vector
+    # # input_sizes = [1024, 2048, 4096, 8192, 16384, 32768] # for Halide blur
+    # input_sizes = [16, 32, 64, 128] # for Halide fft
+    # for j in range(len(input_sizes)):
+    #     variant_runtime = sys.maxsize
+    #     for i in range(test_data.shape[0]):
+    #         # access testing data
+    #         input_size = test_data[:, [1]][i][0] # [1] corresponds to the 'input size'
+    #         if input_size == input_sizes[j]:
+    #             if prd[i][0] < variant_runtime:
+    #                 variant_runtime = prd[i][0]
+    #                 truth = test_data[:, [0]][i][0]
+    #                 variant_schedule = test_x[i]
+    #     f.write(str(input_sizes[j])+',')
+    #     f.write(str(variant_runtime)+',')
+    #     f.write(str(truth)+',')
+    #     for i in range(len(variant_schedule[1:-1])):
+    #         f.write(str(variant_schedule[1:-1][i])+',')
+    #     # f.write('gpu-Quadro') # TODO: read it from filename *_out.csv
+    #     f.write('cpu-I5') # TODO: read it from filename *_out.csv
+    #     f.write('\n')
+    # f.close()
+    # TODO: let it also write truth! rho maybe?
+
+    # f = open('preprocessing_parameters.csv', 'w')
+
+    #     for item in scaler.mean_:
+    #         f.write(str(item)+',')
+    #     f.write('\n')
+
+    #     for item in scaler.scale_:    
+    #         f.write(str(item)+',')
+
+    # f.close()
+
 
     inference_start = time.clock()
     prd = sess.run(prediction, feed_dict={x: test_xs})
+    np.sort(np.squeeze(prd))
     inference_end = time.clock()
 
     # print('The selected variant is', variant_schedule[1:-1])
     # print('Predicted runtime is', variant_runtime)
-    # print('Inference time:', (inference_end - inference_start) / test_data.shape[0])
+    print('Total inference time:', (inference_end - inference_start))
+    print('Test set size:', test_data.shape[0])
+    print('Inference time for each:', (inference_end - inference_start) / test_data.shape[0])
