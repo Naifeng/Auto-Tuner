@@ -15,7 +15,7 @@ import sys
 
 tf.set_random_seed(1234)
 
-# TODO: read from command line
+# read from the command line
 FILENAME = sys.argv[1] # "../halide_dataset/halide_fft_cpu_4000_points_I5.csv" 
 training_size = int(sys.argv[2])
 md5_hash = sys.argv[3]
@@ -33,6 +33,8 @@ data = np.array(pd.read_csv(FILENAME, header=None))
 
 train_data = data[:training_size]
 test_data = data[training_size:]
+
+# print(test_data)
 
 train_feature = np.array(train_data[:, 1:])
 train_label = np.array(train_data[:, [0]])
@@ -57,6 +59,8 @@ test_xs = scaler.transform(test_x)
 # needs to output the mean
 # print("scaler: mean:", scaler.mean_)
 # print("scaler: std:", scaler.scale_)
+
+print("scaler: mean:", type(scaler.mean_[0]))
 
 # write mean and var to a .csv file
 f = open('model_config/' + md5_hash + '/preprocessing.csv', 'w')
@@ -184,42 +188,3 @@ with tf.Session() as sess:
             print("MAPE: ", curr_mape)    
             print('rho:', rho)
             # ------------------#
-
-    # checking the test data
-    # for i in range(test_data.shape[0]):
-    #    print(test_data[:, [1]][i][0]) # [1] corresponds to the 'input size'
-
-    # variant-selection
-    # selected_info = []
-    # write variant-selection results to a .csv file
-    f = open('model_results/vs_re_halide_fft.csv', 'a')
-    # TODO: change to automatically read in a vector
-    # input_sizes = [1024, 2048, 4096, 8192, 16384, 32768] # for Halide blur
-    input_sizes = [16, 32, 64, 128] # for Halide fft
-    for j in range(len(input_sizes)):
-        variant_runtime = sys.maxsize
-        for i in range(test_data.shape[0]):
-            # access testing data
-            input_size = test_data[:, [1]][i][0] # [1] corresponds to the 'input size'
-            if input_size == input_sizes[j]:
-                if prd[i][0] < variant_runtime:
-                    variant_runtime = prd[i][0]
-                    truth = test_data[:, [0]][i][0]
-                    variant_schedule = test_x[i]
-        f.write(str(input_sizes[j])+',')
-        f.write(str(variant_runtime)+',')
-        f.write(str(truth)+',')
-        for i in range(len(variant_schedule[1:-1])):
-            f.write(str(variant_schedule[1:-1][i])+',')
-        # f.write('gpu-Quadro') # TODO: read it from filename *_out.csv
-        f.write('cpu-I5') # TODO: read it from filename *_out.csv
-        f.write('\n')
-    f.close()
-
-    inference_start = time.clock()
-    prd = sess.run(prediction, feed_dict={x: test_xs})
-    inference_end = time.clock()
-
-    # print('The selected variant is', variant_schedule[1:-1])
-    # print('Predicted runtime is', variant_runtime)
-    # print('Inference time:', (inference_end - inference_start) / test_data.shape[0])

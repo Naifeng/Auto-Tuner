@@ -1,4 +1,0 @@
-/Users/zhang/Desktop/Research/Code/Autotuner/autotuner-developing/knowledge_base/build/CMakeFiles/rebuild_cache.dir
-/Users/zhang/Desktop/Research/Code/Autotuner/autotuner-developing/knowledge_base/build/CMakeFiles/edit_cache.dir
-/Users/zhang/Desktop/Research/Code/Autotuner/autotuner-developing/knowledge_base/build/CMakeFiles/load.dir
-/Users/zhang/Desktop/Research/Code/Autotuner/autotuner-developing/knowledge_base/build/CMakeFiles/save.dir

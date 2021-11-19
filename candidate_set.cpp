@@ -22,6 +22,7 @@ int compute_base(int t, std::vector<int> ranges){
 
 // output a csv
 // [t] is the desired number of candidates
+// TODO: identify constraints
 void generate_candidate_set(int t, std::vector<int> ranges){
     
     int base = compute_base(t, ranges);

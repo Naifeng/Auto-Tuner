@@ -1,6 +1,8 @@
-path=../sample_kernel.cpp
+path=/Users/zhang/Desktop/halide_repos/halide_repo_old/tutorial/sample_meta_program.cpp
+compile-cmd=clang++ sample_meta_program.cpp -g -I ../include -L ../bin -lHalide -o sample_meta_program -std=c++11
+run-cmd=DYLD_LIBRARY_PATH=../bin ./sample_meta_program
 decision={cpu,gpu}
-numeric=512 128 1024
-input-data=1024 1024 1024
-reuse-model=y
+input-data=8192
+numeric=1024 1024 1024 1024
+reuse-model=n
 functional=3*4*5
