@@ -2,9 +2,10 @@
 
 # run with: bash genmat.sh
 
-shopt -s expand_aliases
-source ~/.bashrc
+# shopt -s expand_aliases
+# source ~/.bashrc
 
+# a join function that is used later to parse inputs
 join () {
   local IFS="$1"
   shift
@@ -15,53 +16,90 @@ echo " "
 echo "Reading configuration file..."
 echo " "
 
+# count the number of lines in config.txt
+lines=$(grep -c ".*" config.txt)
+
+# calculate the number of Execution Blocks
+blocks=$((($lines - 1) / 7))
+
+# read Decisions
+IFS="=" read entry decisions <<< "$(cat config.txt | sed -n '1p')" 
+echo "decisions=${decisions}" 
+
+# split the 'decision' string and store as an array named 'decision'
+IFS=', ' read -r -a decision <<< "$decisions"
+
+# declare variables and lists
+declare number_of_input_dim
+declare -a md5_list
+declare -a functional_list
+
+# for each Execution Block
+for (( block = 0; block < $blocks; block++ ))
+do
+
+echo " "
+echo "Block $block. Decision: ${decision[$block]}"
+echo " "
+
+# read config.txt
 # $(cat config.txt | sed -n '1p') is the first line of the config file
 # e.g., entry="path", value="../Blur.cpp" 
-IFS="=" read entry path <<< "$(cat config.txt | sed -n '1p')" 
-IFS="=" read entry compile_cmd <<< "$(cat config.txt | sed -n '2p')"
-IFS="=" read entry run_cmd <<< "$(cat config.txt | sed -n '3p')"
 
-# note that decisions are not limited to choosing from using cpu or gpu - any kind of decision can be made
-IFS="=" read entry decision <<< "$(cat config.txt | sed -n '4p')" 
-
-# Currently: default is starting from 2
-IFS="=" read entry input_data <<< "$(cat config.txt | sed -n '5p')" 
-IFS="=" read entry numeric <<< "$(cat config.txt | sed -n '6p')" 
-
-IFS="=" read entry reuse_model <<< "$(cat config.txt | sed -n '7p')"
+IFS="=" read entry input_metadata <<< "$(cat config.txt | sed -n "$(( $block*7 + 2 )) p")" 
+IFS="=" read entry numeric <<< "$(cat config.txt | sed -n "$(( $block*7 + 3 )) p")" 
 # if functional param is specified, read it; if not, ignore
-IFS="=" read entry functional <<< "$(cat config.txt | sed -n '8p')"
+IFS="=" read entry functional <<< "$(cat config.txt | sed -n "$(( $block*7 + 4 )) p")"
 
-# if the env is specified, read it; if not, ignore
-# TODO: check if the env is one of the pre-defined environments in AT
-IFS="=" read entry env <<< "$(cat config.txt | sed -n '9p')" 
+IFS="=" read entry path <<< "$(cat config.txt | sed -n "$(( $block*7 + 5 )) p")" 
+IFS="=" read entry compile_cmd <<< "$(cat config.txt | sed -n "$(( $block*7 + 6 )) p")"
+IFS="=" read entry run_cmd <<< "$(cat config.txt | sed -n "$(( $block*7 + 7 )) p")"
+
+IFS="=" read entry reuse_model <<< "$(cat config.txt | sed -n "$(( $block*7 + 8 )) p")"
+
+# FUTURE: fully automated pre-existing env
+# # if the env is specified, read it; if not, ignore
+# # check if the env is one of the pre-defined environments in GenMAT
+# IFS="=" read entry env <<< "$(cat config.txt | sed -n '9p')" 
 
 # print the config info
-echo "meta-program absolute path=${path}"
+echo "input_metadata parameter=${input_metadata}"
+echo "numeric parameter=${numeric}"
+echo "using pre-trained models=${reuse_model}"
+
+echo "meta-program path=${path}" # both absolute and relative path works
 echo "compile command=${compile_cmd}"
 echo "run command=${run_cmd}"
-echo "decision parameter=${decision}" # TODO: cpu corresponds to profile on available cpus
-echo "numeric parameter=${numeric}"
-echo "input_data parameter=${input_data}"
-echo "using pre-trained models=${reuse_model}"
+
+# if the functional parameter is specified
+isFunctional=true
+
+# if isFunctional, use the specified formula to calculate the additional constant("C" in NN+C)
+# if not, use 1 (which will be normalized by NN+C)
+
 if ! [ -z "$functional" ] 
 then
     echo "functional parameter=${functional}"
+    # e.g., transform 1*2 to 'let functional_param=${all_params[0]}*${all_params[1]}'
+    functional_calculation=$(python3 functional.py $functional)
+    functional_list[$block]=$functional
+else 
+    isFunctional=false
+    functional_list[$block]=1
 fi
+
 if ! [ -z "$env" ] 
 then
     echo "environment=${env}"
 fi
 
-# TODO: maybe above should be genmat.sh
-# genmat.sh should be able to call autotuner.sh several times
-# below is the autotuner.sh
+echo " "
 
 # find the current path 
 autotuner_path=$(pwd)
 
 # generate candidate set
-# in the future: can detect the difference between [2,1024] and {2,1024}
+# FUTURE: detect the difference between [2,1024] and {2,1024}
 clang++ -g -Wall -std=c++11 candidate_set.cpp -o candidate_set
 # default candidate set number = 1000
 # default training set number = 250
@@ -69,20 +107,27 @@ clang++ -g -Wall -std=c++11 candidate_set.cpp -o candidate_set
 
 # default profiling size is 250
 profiling_size=250
-# default training size is 250
-training_size=80 # 80 is used for testing purpose
+# default training size is 100
+training_size=100
+
+# training_size should be (2x) less than profiling_size to see MAPE and rho
 # testing_size=succeeded profiling results - training_size
+# training_set.csv is used for profiling and training/testing the model
 
 head -n $profiling_size candidate_set.csv > training_set.csv
 
-# To create the condition for storing the performance prediction model, 
-# hash the input file and name the folder that stores model.pb file
+# to create the condition for storing the performance prediction model, 
+# hash the input file and name the folder under model_config that stores model.pb file using the hash value
 # so that each input file links to one model.pb
+# model_config serves as a lightweight knowledge base
 md5=($(md5sum ${path}))
 mkdir -p model_config/${md5}
 
-# hash the file and check if model_config has that file
-# model_config serves as a lightweight knowledge base
+# add to the list
+md5_list[$block]=$md5
+
+# split the 'input-data' string
+IFS=', ' read -r -a number_of_input_dim <<< "$input_metadata"
 
 # if the file was not seen before or the user choose not to reuse models
 if [ ! -d model_config/${md5} -o ! $reuse_model == y ]; then
@@ -90,7 +135,6 @@ if [ ! -d model_config/${md5} -o ! $reuse_model == y ]; then
     # start profiling for unknown env by running the provided meta-program
     rm -f profiling_result.csv
 
-    # Profiling
     # trim the '/meta-program' part at the end
     dir_path=${path%/*}
     cd $dir_path
@@ -100,17 +144,19 @@ if [ ! -d model_config/${md5} -o ! $reuse_model == y ]; then
     # feed in multiple parameter sets using the command line arguments
     $compile_cmd
 
-    echo "Profiling..."
+    # Profiling
+
+    echo "Profiling"
 
     while IFS=, read -r array
     do
 
-        # randomly select input dimension given constraints ('input-data') from config.txt
+        # randomly select input dimension given constraints ('input-metadata') from config.txt
         # given: 1024, 1024, 1024
         # output example: 2, 128, 256
 
         # split the 'input-data' string
-        IFS=', ' read -r -a input_range <<< "$input_data"
+        IFS=', ' read -r -a input_range <<< "$input_metadata"
         # iteratively go through all the element/range_limit
         for index in "${!input_range[@]}"
         do
@@ -127,13 +173,31 @@ if [ ! -d model_config/${md5} -o ! $reuse_model == y ]; then
 
         array_unjoined=$(tr ',' '\n' <<< ${array[@]})
 
+        IFS=', ' read -r -a numerics <<< "${array[@]}"
+
+        # echo "input=${input_dim[@]}"
+        # echo "array=${numerics[@]}"
+
+        all_params=("${input_dim[@]}" "${numerics[@]}")
+
+        # echo ${all_params[@]}
+        # echo $isFunctional
+
+        if [ "$isFunctional" = true ] ; then
+            # example: 
+            # functional_calculation='let functional_param=${all_params[0]}*${all_params[1]}'
+
+            # pay extra caution to this line as 'eval $cmd' might be malicious
+            eval $functional_calculation
+        else 
+            # append 1 when the user does not specify functional parameters
+            functional_param=1
+        fi
+
+        # echo $functional_param
+
         # 'date' for Linux; 'gdate' for MacOS
         start=`gdate +%s.%N`
-
-        # TODO: write sample meta-programs 
-        #   1. MMM (tuning between Eigen and Boost) 
-        #   2. Halide Blur 
-        #   3. meta-program template
 
         # Current mode is for users without zero understanding of the program.
         # Therefore, the user does not need to know the constraints for each tuning knob-some execution will fail because of this
@@ -142,105 +206,78 @@ if [ ! -d model_config/${md5} -o ! $reuse_model == y ]; then
 
         # pay extra caution to this line as 'eval $cmd' might be malicious
         if error_msg=$(eval $run_cmd ${input_dim[@]} $array_unjoined 2>&1) ; then 
-            echo "Command succeeded"
-
+            # echo "Command succeeded"
+            echo -n "."
+            
+            # 'date' for Linux; 'gdate' for MacOS
             end=`gdate +%s.%N`
+
             runtime=$( echo "$end - $start" | bc -l ) # in second 
 
             input_dim_joined=$(join , "${input_dim[@]}") # joined refers to using comma to 'join' each element
             # echo "input=$input_dim_joined"
             # echo "array=${array[@]}"
 
-            # TODO: add constant (a mathmatical function of elements in input_dim)
-            echo "$runtime,$input_dim_joined,${array[@]}" >> $autotuner_path/profiling_result.csv 
+            echo "$runtime,$input_dim_joined,${array[@]},$functional_param" >> $autotuner_path/profiling_result.csv 
 
-        else
-            echo "Command failed"
+        # else
+            # echo "Command failed"
             # echo $error_msg
         fi
 
     done < $autotuner_path/training_set.csv
 
-    # --------------- Existing environments -----------------
-
-    # g++ -g -Wall -std=c++11 autotuner.cpp candidate_set.cpp -o autotuner
-    # ./autotuner ../../$filename $env # autotuner.cpp should change name to env_cheking.cpp
-
-    # # For HalideSAR
-    # if test -f "${env}_profiling_result.csv"; then
-    #     echo -e "Performance model for this version of the task exists"
-    #     # echo -e "Would you like to reuse it? (y/n)"
-    #     # read reuse_choice
-    #     if [[ $reuse == y ]]; then
-    #         echo "Reusing the pre-trained model..."
-    #         profiling_size=7
-    #         # Connect to KB
-    #     else 
-    #         # g++ -g -Wall -std=c++11 replace.cpp -o replace
-    #         # # Not reusing
-    #         # # delete profiling_result.csv
-    #         # rm ${env}_profiling_result.csv
-    #         # echo -e "Profiling..."
-    #         # while IFS=, read -r p1 p2
-    #         # do
-    #         #     # generate CMakeLists.txt
-    #         #     ./replace ../../CMakeLists.txt HalideSAR $p1 $p2
-    #         #     cd .. # build folder
-    #         #     make
-    #         #     ts=$(date +%s%N)
-    #         #     # ./sarbp -p ../data/Sandia/npy -o Sandia.png -d -45.0 -D 0.0 -t 30 -u 2
-    #         #     ./sarbp -p ../data/AFRL/pass1/HH_npy -o AFRL.png -d -30.0 -D 0.0 -t 17 -u 2
-    #         #     tt=$((($(date +%s%N) - $ts)/1000000))
-    #         #     echo "Time taken: $tt milliseconds"
-    #         #     # 30, 900 are tentative values
-    #         #     echo "$tt,4096,$p1,$p2,16777216" >> autotuner/${env}_profiling_result.csv
-    #         #     cd autotuner/
-    #         # done < training_set.csv
-
-    #         echo -e "Training performance prediction model..."
-    #     fi
-    # fi
-
-    # Sometimes need to shuffle and sometimes not
-    # python3 shuffle.py ${env}_profiling_result.csv 
-
-    # ---------------------------------------------------------
-
     cd $autotuner_path
+
+    echo " "
     echo "Currently at: $(pwd)"
 
     echo "md5: $md5"
 
-    python3 perf_model.py profiling_result.csv $training_size $md5
-    # python3 perf_model.py ../halide_dataset/halide_fft_cpu_4000_points_I5.csv $training_size $md5
-    # python3 perf_model.py profiling_result.csv 80 0b8ffcf2d31912a1ac9a3f3d4f74debd
+    # Performance Prediction
+
+    python3 perf_model.py profiling_result.csv $training_size $md5 ${decision[$block]}
+
 fi
 
-# copy to a folder named 'current' under the 'model_config' file
-# KB will automatically read from the 'current' file
-rm -rf model_config/current
-cp -r model_config/${md5} model_config/current
-
-# load stored model and inference
-# read from model_config/$md5 and inference on candidate_set.csv
-# TODO: currently only works for single input_data
-for (( t = 2; t <= input_data; t = t * 2 )) 
-do  
-    python3 inference.py candidate_set.csv $t $md5 
-    # python3 inference.py candidate_set.csv 1024 0b8ffcf2d31912a1ac9a3f3d4f74debd
 done
 
-# TODO: choose between cpu and gpu
-# always run platform-select.py (change it to decision.py)
-# multiple config.txt
+# echo ${functional_list[@]}
 
-# Example of integrating with external KB
-# # go to KB 
-# # KB need to select variant using multiple input data
-# cd knowledge_base/build/
-# # suppress tensorflow warnings
-# export TF_CPP_MIN_LOG_LEVEL=2
-# # KB procedures
-# # 'make' after modifying KB
-# ./save
-# ./load
+echo "--------------Query Interface--------------"
+echo "type 'quit' or use CTRL-C to exit"
+echo " "
+
+# echo ${#number_of_input_dim[@]}
+
+input_size=0
+while [ "$input_size" != quit ] 
+do 
+    echo "type the input size you would like to query:"
+    IFS= read -r input_size
+
+    if [ "$input_size" == quit ]; then continue
+    fi
+
+    IFS=', ' read -r -a inputs <<< "$input_size"
+    
+    if [ ${#inputs[@]} != ${#number_of_input_dim[@]} ]; then
+        echo "number of input dimensions should be ${#number_of_input_dim[@]}"
+        continue
+    fi
+    
+    # need a new csv file to store the best variant for each decision
+    rm -f best_candidates.csv
+
+    # for each queried input
+    # iterate through all md5-decision combinations and use the pre-trained model there to inference
+    for (( block = 0; block < $blocks; block++ ))
+    do  
+        # load stored model and inference
+        # read from model_config/$md5/$decision and inference on candidate_set.csv
+        python3 inference.py candidate_set.csv ${md5_list[$block]} ${decision[$block]} $input_size ${functional_list[$block]}
+    done
+
+    # choose between decisions (e.g., cpu and gpu) - decision.py
+    python3 decision.py $input_size
+done 

@@ -19,15 +19,16 @@ tf.set_random_seed(1234)
 FILENAME = sys.argv[1] # "../halide_dataset/halide_fft_cpu_4000_points_I5.csv" 
 training_size = int(sys.argv[2])
 md5_hash = sys.argv[3]
+decision = sys.argv[4]
 
 if not os.path.exists('model_config'):
     os.makedirs('model_config')
 
-# if not os.path.exists('model_config'):
-#     os.makedirs('model_config/' + md5_hash)
-
 if not os.path.exists('model_results'):
     os.makedirs('model_results')
+
+if not os.path.exists('model_config/' + md5_hash + '/' + decision):
+    os.makedirs('model_config/' + md5_hash + '/' + decision)
 
 data = np.array(pd.read_csv(FILENAME, header=None))
 
@@ -60,10 +61,10 @@ test_xs = scaler.transform(test_x)
 # print("scaler: mean:", scaler.mean_)
 # print("scaler: std:", scaler.scale_)
 
-print("scaler: mean:", type(scaler.mean_[0]))
+# print("scaler: mean type:", type(scaler.mean_[0]))
 
 # write mean and var to a .csv file
-f = open('model_config/' + md5_hash + '/preprocessing.csv', 'w')
+f = open('model_config/' + md5_hash + '/' + decision + '/preprocessing.csv', 'w+')
 
 for item in scaler.mean_:
     f.write(str(item)+',')
@@ -99,7 +100,7 @@ for variable in tf.trainable_variables():
     total_parameters += variable_parameters
 # print("total parameters: ", total_parameters)
 
-print("Selecting the best variant...")
+print("Training the performance prediction model...")
 
 with tf.Session() as sess:
 
@@ -111,10 +112,9 @@ with tf.Session() as sess:
     highest_rho = 0
     asso_rho = 0
     
-    for i in range(20000):
+    for j in range(20000):
         sess.run(train_step, feed_dict={x: train_feature, y: train_label})
-        if i % 200 == 0:
-            # print(i)
+        if j % 200 == 0:
             # print(sess.run(loss, feed_dict={x: train_feature, y: train_label}))
             prd = sess.run(prediction, feed_dict={x: test_xs})
             
@@ -170,21 +170,22 @@ with tf.Session() as sess:
                 asso_rho = rho
 
                 # write results to a .txt file
-                f = open('model_results/predictions.txt', 'w')
+                f = open('model_results/training_predictions.txt', 'w+')
                 for i in range(test_data.shape[0]):
                     f.writelines(str(prd[i][0]) + "\n")
                 f.close()
 
                 # save the model as a .pb graph
-                with open('model_config/' + md5_hash + '/model.pb', 'wb') as f:
+                # one model for each <kernel, decision> combination
+                with open('model_config/' + md5_hash + '/' + decision + '/model.pb', 'wb') as f:
                     f.write(tf.get_default_graph().as_graph_def().SerializeToString())
 
-                saver.save(sess, 'model_config/' + md5_hash + '/my-model.ckpt')
+                saver.save(sess, 'model_config/' + md5_hash + '/' + decision + '/my-model.ckpt')
 
             # valid rule
             if rho > highest_rho:
                 highest_rho = rho
             
-            print("MAPE: ", curr_mape)    
-            print('rho:', rho)
+            if j == (20000 - 200):
+                print("\nMAPE:", curr_mape, "rho:", round(rho, 2))    
             # ------------------#

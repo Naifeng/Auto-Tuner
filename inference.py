@@ -13,12 +13,20 @@ import sys
 import csv
 import time
 
+np.set_printoptions(suppress=True)
+
 tf.set_random_seed(1234)
 
 # read from the command line
 FILENAME = sys.argv[1] 
-input_dim = sys.argv[2]
-md5_hash = sys.argv[3]
+md5_hash = sys.argv[2]
+decision = sys.argv[3]
+input_dim = []
+for i in range(4, (len(sys.argv)-1)):
+    input_dim.append(int(sys.argv[i]))
+functional = sys.argv[len(sys.argv)-1]
+
+print('decision', decision)
 
 data = np.array(pd.read_csv(FILENAME, header=None))
 
@@ -28,13 +36,39 @@ test_data = data[:] # should be [:]
 
 test_x = np.array(test_data[:, :])
 
-input_dim_array = np.full((test_x.shape[0], 1), input_dim)
+# (len(sys.argv)-1) - 3(argv[1-3]) - 1(functional) is the number of input dimensions in given input size
+input_dim_array = np.full((test_x.shape[0], len(sys.argv) - 5), input_dim) 
 
 # append input dim to test_x
 test_x = np.append(input_dim_array.astype(float), test_x, 1)
 
+# append functional to the last
+
+# print(functional)
+
+if functional != "1":
+    # translate to string first
+    functional = ''.join("test_x[i][" + str(int(c)-1) + "]" if c.isdigit() else c for c in functional)
+
+    # functional needs to access both input_dim and candidate
+    functional_array = np.zeros(shape=(len(test_x),1))
+
+    # for each row in test_x
+    # perform operation indicated by functional
+    for i in range(len(test_x)):
+        # use exec() to execute the string
+        exec("functional_array[i] = " + functional)
+
+else:
+    functional_array = np.ones(shape=(len(test_x),1))
+
+# append functional to test_x
+test_x = np.append(test_x, functional_array.astype(float), 1)
+
+# print(test_x)
+
 # read mean and var for the preprocessing scalar from a .csv file
-f = open('model_config/' + md5_hash + '/preprocessing.csv')
+f = open('model_config/' + md5_hash + '/' + decision + '/preprocessing.csv')
 
 reader = csv.reader(f, delimiter=",")
 data_read = [row for row in reader]
@@ -63,63 +97,17 @@ saver = tf.train.Saver()
 
 with tf.Session() as sess:
 
-    saver.restore(sess, tf.train.latest_checkpoint('model_config/' + md5_hash))
+    saver.restore(sess, tf.train.latest_checkpoint('model_config/' + md5_hash + '/' + decision))
     
     # inference_start = time.clock()
     prd = sess.run(prediction, feed_dict={x: test_xs})
     # inference_end = time.clock()
     
-    f = open('model_results/predictions.txt', 'w') 
+    f = open('model_results/inference_predictions.txt', 'w+') 
     for i in range(test_data.shape[0]):
         f.writelines(str(prd[i][0]) + "\n")
     f.close()
 
-# evaluation starts here
-
-# checking the test data
-# for i in range(test_data.shape[0]):
-#    print(test_data[:, [1]][i][0]) # [1] corresponds to the 'input size'
-
-# # variant-selection
-# # selected_info = []
-# # write variant-selection results to a .csv file
-# f = open('model_results/vs_re_halide_fft.csv', 'a')
-# # TODO: change to automatically read in a vector
-# # input_sizes = [1024, 2048, 4096, 8192, 16384, 32768] # for Halide blur
-# input_sizes = [16, 32, 64, 128] # for Halide fft
-# for j in range(len(input_sizes)):
-#     variant_runtime = sys.maxsize
-#     for i in range(test_data.shape[0]):
-#         # access testing data
-#         input_size = test_data[:, [1]][i][0] # [1] corresponds to the 'input size'
-#         if input_size == input_sizes[j]:
-#             if prd[i][0] < variant_runtime:
-#                 variant_runtime = prd[i][0]
-#                 truth = test_data[:, [0]][i][0]
-#                 variant_schedule = test_x[i]
-#     f.write(str(input_sizes[j])+',')
-#     f.write(str(variant_runtime)+',')
-#     f.write(str(truth)+',')
-#     for i in range(len(variant_schedule[1:-1])):
-#         f.write(str(variant_schedule[1:-1][i])+',')
-#     # f.write('gpu-Quadro') # TODO: read it from filename *_out.csv
-#     f.write('cpu-I5') # TODO: read it from filename *_out.csv
-#     f.write('\n')
-# f.close()
-
-# TODO: show example selections
-# input-1, []
-# ...
-# then ask the user which input do you want to tune
-# because NN+C can generalize, it might work for any unforeseen input sizes
-
-# inference_start = time.clock()
-# prd = sess.run(prediction, feed_dict={x: test_xs})
-# inference_end = time.clock()
-
-# variant-selection using the test data
-
-# should show best variant for each input size - maybe use the code above?
 variant_runtime = sys.maxsize
 for i in range(test_data.shape[0]):
     if prd[i][0] < variant_runtime:
@@ -127,7 +115,19 @@ for i in range(test_data.shape[0]):
         variant_schedule = test_x[i]
 f.close()
 
-print('The selected variant for input dimension(s)', input_dim, 'is', variant_schedule[1:]) # -1 excludes the last one, i.e. if there is cons, use -1
+print('The selected variant for input size', input_dim, 'is', variant_schedule[len(input_dim):-1]) # -1 excludes the last one, i.e. if there is cons, use -1
 # print('Predicted runtime is', variant_runtime)
 # print('Inference time:', (inference_end - inference_start) / test_data.shape[0])
+
+# write to a file to make global decisions
+f = open('best_candidates.csv', 'a')
+for i in range(len(input_dim)):
+    f.write(str(input_dim[i])+',')
+f.write(str(variant_runtime)+',')
+for i in range(len(variant_schedule[len(input_dim):-1])):
+    f.write(str(variant_schedule[len(input_dim):-1][i])+',')
+f.write(decision) 
+f.write('\n')
+f.close()
+
 
