@@ -4,6 +4,8 @@ GenMAT is a portable tool for identifying the best variant of any application sp
 
 GenMAT automatically profiles the application by varying the exposed tunable parameters to generate a small set of profiling data. Then, GenMAT trains a compact machine learning model that is used to quickly predict the runtimes of a large number of possible parameter settings to identify the best variant.
 
+For more details, please view the full paper [here](https://naifeng.github.io/assets/pdf/PEHC_GenMAT_2021.pdf).
+
 ---
 
 *GenMAT is still being actively developed for new features. Please do not hesitate to contact me if you find any bug or have any questions.*
